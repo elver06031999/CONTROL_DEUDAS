@@ -1,7 +1,6 @@
 import os
 import re
 import sqlite3
-import base64
 from datetime import datetime, timedelta
 import io
 import streamlit as st
@@ -559,10 +558,7 @@ with tab_pagados:
                         with open(ruta_archivo, "rb") as f:
                             pdf_bytes = f.read()
                         
-                        base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
-                        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>'
-                        st.markdown(pdf_display, unsafe_allow_html=True)
-                        
+                        st.success("Comprobante en formato PDF disponible.")
                         st.download_button(
                             label="Descargar Comprobante PDF",
                             data=pdf_bytes,
