@@ -23,6 +23,11 @@ st.set_page_config(
 # Estilos CSS
 st.markdown("""
     <style>
+    /* Ocultar texto auxiliar 'Press Enter to submit form' */
+    [data-testid="InputInstructions"] {
+        display: none !important;
+    }
+
     /* Fondo principal y tipografía general */
     .main {
         background-color: #F4F6F9;
