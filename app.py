@@ -23,13 +23,10 @@ st.set_page_config(
 # Estilos CSS con paleta institucional SUNAT (Azul #003366 y Rojo #D91A2A)
 st.markdown("""
     <style>
-    /* Fondo principal y tipografía general */
     .main {
         background-color: #F4F6F9;
         font-family: 'Segoe UI', Arial, sans-serif;
     }
-    
-    /* Encabezado Principal al estilo SUNAT */
     .titulo-corporativo {
         color: #003366;
         font-size: 24px;
@@ -39,8 +36,6 @@ st.markdown("""
         padding-bottom: 10px;
         border-bottom: 3px solid #D91A2A;
     }
-    
-    /* Subtítulos de sección */
     .subtitulo-corporativo {
         color: #003366;
         font-size: 15px;
@@ -50,8 +45,6 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-
-    /* Fondo de la Barra Lateral */
     [data-testid="stSidebar"] {
         background-color: #FFFFFF;
         border-right: 1px solid #E0E0E0;
@@ -64,8 +57,6 @@ st.markdown("""
         background-color: #F8F9FA !important;
         border: 1px solid #CCCCCC !important;
     }
-
-    /* Pestañas (Tabs) estilo SUNAT */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #E9ECEF;
@@ -83,20 +74,19 @@ st.markdown("""
         background-color: #D91A2A !important;
         color: #FFFFFF !important;
     }
-
-    /* Botones estilo Primario SUNAT (Aplica globalmente y en Sidebar) */
-    div.stButton > button {
+    div.stButton > button, div[data-testid="stForm"] button {
         background-color: #003366 !important;
         color: #FFFFFF !important;
         font-weight: 700 !important;
         font-size: 15px !important;
         border-radius: 4px !important;
         border: none !important;
+        width: 100% !important;
     }
-    div.stButton > button * {
+    div.stButton > button *, div[data-testid="stForm"] button * {
         color: #FFFFFF !important;
     }
-    div.stButton > button:hover {
+    div.stButton > button:hover, div[data-testid="stForm"] button:hover {
         background-color: #D91A2A !important;
         color: #FFFFFF !important;
     }
@@ -315,12 +305,14 @@ opcion_sidebar = st.sidebar.radio("Seleccione Operación:", ["Registro de Contri
 if opcion_sidebar == "Registro de Contribuyente":
     st.sidebar.markdown('<div class="subtitulo-corporativo">Datos del Contribuyente</div>', unsafe_allow_html=True)
     
-    reg_ruc = st.sidebar.text_input("Número de RUC (11 dígitos):", max_chars=11)
-    reg_razon = st.sidebar.text_input("Razón Social / Nombre Comercial:")
-    reg_regimen = st.sidebar.selectbox("Régimen Tributario:", ["MYPE Tributario", "Régimen General", "RER (Especial)", "NRUS"])
-    reg_contacto = st.sidebar.text_input("Contacto Administrativo:")
+    with st.sidebar.form(key="form_contribuyente", clear_on_submit=True):
+        reg_ruc = st.text_input("Número de RUC (11 dígitos):", max_chars=11)
+        reg_razon = st.text_input("Razón Social / Nombre Comercial:")
+        reg_regimen = st.selectbox("Régimen Tributario:", ["MYPE Tributario", "Régimen General", "RER (Especial)", "NRUS"])
+        reg_contacto = st.text_input("Contacto Administrativo:")
+        btn_guardar_cli = st.form_submit_button("Guardar Contribuyente", use_container_width=True)
 
-    if st.sidebar.button("Guardar Contribuyente", use_container_width=True):
+    if btn_guardar_cli:
         if len(reg_ruc) != 11 or not reg_ruc.isdigit():
             st.sidebar.error("El RUC debe contar con exactamente 11 dígitos numéricos.")
         elif not reg_razon.strip():
@@ -343,20 +335,18 @@ elif opcion_sidebar == "Registro de Obligación":
     if not clientes_db:
         st.sidebar.warning("No existen contribuyentes registrados. Ingrese uno antes de continuar.")
     else:
-        cliente_sel = st.sidebar.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x])
-        tipo_ob = st.sidebar.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"])
-        situacion_ob = st.sidebar.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"])
-        periodo_ob = st.sidebar.text_input("Periodo Tributario (AAAA-MM):", placeholder="Ej: 2026-07")
+        with st.sidebar.form(key="form_obligacion", clear_on_submit=True):
+            cliente_sel = st.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x])
+            tipo_ob = st.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"])
+            situacion_ob = st.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"])
+            periodo_ob = st.text_input("Periodo Tributario (AAAA-MM):", placeholder="Ej: 2026-07")
+            venc_ob = st.text_input("Fecha de Vencimiento (AAAA-MM-DD):", placeholder="AAAA-MM-DD")
+            monto_ob = st.number_input("Monto Determinado (S/):", min_value=0.0, step=10.0, format="%.2f")
+            pago_ob = st.date_input("Fecha de Pago Ejecutado (Opcional):", value=None, format="DD/MM/YYYY")
+            tributos_ob = st.text_input("Descripción / Código de Tributo:")
+            btn_guardar_ob = st.form_submit_button("Guardar Obligación", use_container_width=True)
 
-        ruc_cliente_sel = [c[1] for c in clientes_db if c[0] == cliente_sel][0]
-        venc_sugerido = calcular_vencimiento_sunat_aproximado(ruc_cliente_sel, periodo_ob)
-
-        venc_ob = st.sidebar.text_input("Fecha de Vencimiento (AAAA-MM-DD):", value=venc_sugerido)
-        monto_ob = st.sidebar.number_input("Monto Determinado (S/):", min_value=0.0, step=10.0, format="%.2f")
-        pago_ob = st.sidebar.date_input("Fecha de Pago Ejecutado (Opcional):", value=None, format="DD/MM/YYYY")
-        tributos_ob = st.sidebar.text_input("Descripción / Código de Tributo:")
-
-        if st.sidebar.button("Guardar Obligación", use_container_width=True):
+        if btn_guardar_ob:
             if not validar_periodo(periodo_ob):
                 st.sidebar.error("El periodo debe mantener la estructura AAAA-MM.")
             elif monto_ob <= 0:
