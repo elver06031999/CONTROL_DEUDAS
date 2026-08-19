@@ -314,10 +314,16 @@ opcion_sidebar = st.sidebar.radio("Seleccione Operación:", ["Registro de Contri
 
 if opcion_sidebar == "Registro de Contribuyente":
     st.sidebar.markdown('<div class="subtitulo-corporativo">Datos del Contribuyente</div>', unsafe_allow_html=True)
-    reg_ruc = st.sidebar.text_input("Número de RUC (11 dígitos):", max_chars=11)
-    reg_razon = st.sidebar.text_input("Razón Social / Nombre Comercial:")
-    reg_regimen = st.sidebar.selectbox("Régimen Tributario:", ["MYPE Tributario", "Régimen General", "RER (Especial)", "NRUS"])
-    reg_contacto = st.sidebar.text_input("Contacto Administrativo:")
+    
+    # Inicialización de keys para el formulario de contribuyentes
+    for key in ["reg_ruc", "reg_razon", "reg_contacto"]:
+        if key not in st.session_state:
+            st.session_state[key] = ""
+
+    reg_ruc = st.sidebar.text_input("Número de RUC (11 dígitos):", max_chars=11, key="reg_ruc")
+    reg_razon = st.sidebar.text_input("Razón Social / Nombre Comercial:", key="reg_razon")
+    reg_regimen = st.sidebar.selectbox("Régimen Tributario:", ["MYPE Tributario", "Régimen General", "RER (Especial)", "NRUS"], key="reg_regimen")
+    reg_contacto = st.sidebar.text_input("Contacto Administrativo:", key="reg_contacto")
 
     if st.sidebar.button("Guardar Contribuyente", use_container_width=True):
         if len(reg_ruc) != 11 or not reg_ruc.isdigit():
@@ -332,7 +338,13 @@ if opcion_sidebar == "Registro de Contribuyente":
                           (reg_ruc, reg_razon, reg_contacto, reg_regimen))
                 conn.commit()
                 conn.close()
-                st.sidebar.success(f"Contribuyente '{reg_razon}' registrado correctamente.")
+                
+                # Limpiar variables tras guardar
+                st.session_state["reg_ruc"] = ""
+                st.session_state["reg_razon"] = ""
+                st.session_state["reg_contacto"] = ""
+                
+                st.sidebar.success(f"Contribuyente registrado correctamente.")
                 st.rerun()
             except sqlite3.IntegrityError:
                 st.sidebar.error("El número de RUC ingresado ya se encuentra registrado.")
@@ -342,18 +354,23 @@ elif opcion_sidebar == "Registro de Obligación":
     if not clientes_db:
         st.sidebar.warning("No existen contribuyentes registrados. Ingrese uno antes de continuar.")
     else:
-        cliente_sel = st.sidebar.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x])
-        tipo_ob = st.sidebar.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"])
-        situacion_ob = st.sidebar.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"])
-        periodo_ob = st.sidebar.text_input("Periodo Tributario (AAAA-MM):", placeholder="Ej: 2026-07")
+        # Inicialización de keys para el formulario de obligaciones
+        for key in ["periodo_ob", "tributos_ob"]:
+            if key not in st.session_state:
+                st.session_state[key] = ""
+
+        cliente_sel = st.sidebar.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x], key="cliente_sel_ob")
+        tipo_ob = st.sidebar.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"], key="tipo_ob_sel")
+        situacion_ob = st.sidebar.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"], key="situacion_ob_sel")
+        periodo_ob = st.sidebar.text_input("Periodo Tributario (AAAA-MM):", placeholder="Ej: 2026-07", key="periodo_ob")
 
         ruc_cliente_sel = [c[1] for c in clientes_db if c[0] == cliente_sel][0]
         venc_sugerido = calcular_vencimiento_sunat_aproximado(ruc_cliente_sel, periodo_ob)
 
-        venc_ob = st.sidebar.text_input("Fecha de Vencimiento (AAAA-MM-DD):", value=venc_sugerido)
-        monto_ob = st.sidebar.number_input("Monto Determinado (S/):", min_value=0.0, step=10.0, format="%.2f")
-        pago_ob = st.sidebar.date_input("Fecha de Pago Ejecutado (Opcional):", value=None, format="DD/MM/YYYY")
-        tributos_ob = st.sidebar.text_input("Descripción / Código de Tributo:")
+        venc_ob = st.sidebar.text_input("Fecha de Vencimiento (AAAA-MM-DD):", value=venc_sugerido, key="venc_ob")
+        monto_ob = st.sidebar.number_input("Monto Determinado (S/):", min_value=0.0, step=10.0, format="%.2f", key="monto_ob")
+        pago_ob = st.sidebar.date_input("Fecha de Pago Ejecutado (Opcional):", value=None, format="DD/MM/YYYY", key="pago_ob")
+        tributos_ob = st.sidebar.text_input("Descripción / Código de Tributo:", key="tributos_ob")
 
         if st.sidebar.button("Guardar Obligación", use_container_width=True):
             if not validar_periodo(periodo_ob):
@@ -370,6 +387,12 @@ elif opcion_sidebar == "Registro de Obligación":
                           (cliente_sel, tipo_ob, periodo_ob, monto_ob, venc_ob, estado_ob, fecha_pago_str, situacion_ob, tributos_ob))
                 conn.commit()
                 conn.close()
+                
+                # Limpiar variables tras guardar
+                st.session_state["periodo_ob"] = ""
+                st.session_state["tributos_ob"] = ""
+                st.session_state["monto_ob"] = 0.0
+                
                 st.sidebar.success("Obligación financiera registrada en el sistema.")
                 st.rerun()
 
