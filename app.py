@@ -553,7 +553,7 @@ with tab_pagados:
                     extension = os.path.splitext(ruta_archivo)[1].lower()
                     
                     if extension in [".png", ".jpg", ".jpeg"]:
-                        st.image(ruta_archivo, use_column_width=True)
+                        st.image(ruta_archivo, use_container_width=True)
                     elif extension == ".pdf":
                         with open(ruta_archivo, "rb") as f:
                             pdf_bytes = f.read()
