@@ -1,0 +1,6 @@
+.venv/
+vouchers/
+"constancia de pagos/"
+control_deudas.db
+__pycache__/
+*.pyc
