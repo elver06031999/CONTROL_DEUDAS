@@ -1,6 +1,7 @@
 import os
 import re
 import sqlite3
+import base64
 from datetime import datetime, timedelta
 import io
 import streamlit as st
@@ -20,7 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS corregidos
+# Estilos CSS
 st.markdown("""
     <style>
     /* Fondo principal y tipografía general */
@@ -361,7 +362,7 @@ elif opcion_sidebar == "Registro de Obligación":
     if not clientes_db:
         st.sidebar.warning("No existen contribuyentes registrados. Ingrese uno antes de continuar.")
     else:
-        # Selección previa fuera del formulario para calcular vencimiento dinámicamente
+        # Selección previa fuera del formulario para cálculo dinámico de vencimiento
         cliente_sel = st.sidebar.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x])
         tipo_ob = st.sidebar.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"])
         situacion_ob = st.sidebar.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"])
@@ -549,10 +550,26 @@ with tab_pagados:
                 res = c.fetchone()
                 conn.close()
                 if res and res[0] and os.path.exists(res[0]):
-                    if res[0].lower().endswith((".png", ".jpg", ".jpeg")):
-                        st.image(res[0])
-                    else:
-                        st.info(f"Ruta de archivo digital: {res[0]}")
+                    ruta_archivo = res[0]
+                    extension = os.path.splitext(ruta_archivo)[1].lower()
+                    
+                    if extension in [".png", ".jpg", ".jpeg"]:
+                        st.image(ruta_archivo, use_column_width=True)
+                    elif extension == ".pdf":
+                        with open(ruta_archivo, "rb") as f:
+                            pdf_bytes = f.read()
+                        
+                        base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+                        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>'
+                        st.markdown(pdf_display, unsafe_allow_html=True)
+                        
+                        st.download_button(
+                            label="Descargar Comprobante PDF",
+                            data=pdf_bytes,
+                            file_name=os.path.basename(ruta_archivo),
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
                 else:
                     st.error("No se registra comprobante adjunto para el ID indicado.")
 
