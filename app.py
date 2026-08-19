@@ -20,13 +20,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS con paleta institucional SUNAT (Azul #003366 y Rojo #D91A2A)
+# Estilos CSS corregidos (evita interferencias con despegables)
 st.markdown("""
     <style>
+    /* Fondo principal y tipografía general */
     .main {
         background-color: #F4F6F9;
         font-family: 'Segoe UI', Arial, sans-serif;
     }
+    
+    /* Encabezado Principal */
     .titulo-corporativo {
         color: #003366;
         font-size: 24px;
@@ -36,6 +39,8 @@ st.markdown("""
         padding-bottom: 10px;
         border-bottom: 3px solid #D91A2A;
     }
+    
+    /* Subtítulos de sección */
     .subtitulo-corporativo {
         color: #003366;
         font-size: 15px;
@@ -45,6 +50,8 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+
+    /* Fondo y texto de la Barra Lateral */
     [data-testid="stSidebar"] {
         background-color: #FFFFFF;
         border-right: 1px solid #E0E0E0;
@@ -52,11 +59,28 @@ st.markdown("""
     [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] span {
         color: #333333 !important;
     }
-    [data-testid="stSidebar"] input, [data-testid="stSidebar"] select {
+
+    /* Campos de entrada de texto */
+    [data-testid="stSidebar"] input {
         color: #000000 !important;
-        background-color: #F8F9FA !important;
+        background-color: #FFFFFF !important;
         border: 1px solid #CCCCCC !important;
     }
+    
+    /* Selectbox (Desplegables) */
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 1px solid #CCCCCC !important;
+    }
+    div[data-baseweb="select"] span {
+        color: #000000 !important;
+    }
+    div[data-baseweb="icon"] svg {
+        fill: #003366 !important;
+    }
+
+    /* Pestañas (Tabs) estilo SUNAT */
     .stTabs [data-baseweb="tab-list"] {
         gap: 6px;
         background-color: #E9ECEF;
@@ -74,7 +98,9 @@ st.markdown("""
         background-color: #D91A2A !important;
         color: #FFFFFF !important;
     }
-    div.stButton > button, div[data-testid="stForm"] button {
+
+    /* Botones de envío de formulario exclusivamente */
+    div[data-testid="stFormSubmitButton"] > button, div.stButton > button {
         background-color: #003366 !important;
         color: #FFFFFF !important;
         font-weight: 700 !important;
@@ -83,12 +109,11 @@ st.markdown("""
         border: none !important;
         width: 100% !important;
     }
-    div.stButton > button *, div[data-testid="stForm"] button * {
+    div[data-testid="stFormSubmitButton"] > button p, div.stButton > button p {
         color: #FFFFFF !important;
     }
-    div.stButton > button:hover, div[data-testid="stForm"] button:hover {
+    div[data-testid="stFormSubmitButton"] > button:hover, div.stButton > button:hover {
         background-color: #D91A2A !important;
-        color: #FFFFFF !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -140,25 +165,6 @@ def validar_periodo(periodo_str):
     if not periodo_str:
         return False
     return bool(re.match(r"^\d{4}-(0[1-9]|1[0-2])$", periodo_str))
-
-def calcular_vencimiento_sunat_aproximado(ruc, periodo):
-    if not ruc or len(ruc) != 11 or not validar_periodo(periodo):
-        return ""
-    try:
-        ultimo_digito = int(ruc[-1])
-        año, mes = map(int, periodo.split("-"))
-        if mes == 12:
-            mes_venc = 1
-            año_venc = año + 1
-        else:
-            mes_venc = mes + 1
-            año_venc = año
-
-        dias_offset = {0: 14, 1: 15, 2: 16, 3: 17, 4: 18, 5: 19, 6: 20, 7: 21, 8: 22, 9: 23}
-        dia = dias_offset.get(ultimo_digito, 15)
-        return f"{año_venc:04d}-{mes_venc:02d}-{dia:02d}"
-    except Exception:
-        return ""
 
 def guardar_voucher_local(uploaded_file, id_obligacion):
     if uploaded_file is None:
