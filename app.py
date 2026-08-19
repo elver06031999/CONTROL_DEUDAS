@@ -20,7 +20,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS corregidos (evita interferencias con despegables)
+# Estilos CSS corregidos
 st.markdown("""
     <style>
     /* Fondo principal y tipografía general */
@@ -99,7 +99,7 @@ st.markdown("""
         color: #FFFFFF !important;
     }
 
-    /* Botones de envío de formulario exclusivamente */
+    /* Botones de envío de formulario */
     div[data-testid="stFormSubmitButton"] > button, div.stButton > button {
         background-color: #003366 !important;
         color: #FFFFFF !important;
@@ -165,6 +165,25 @@ def validar_periodo(periodo_str):
     if not periodo_str:
         return False
     return bool(re.match(r"^\d{4}-(0[1-9]|1[0-2])$", periodo_str))
+
+def calcular_vencimiento_sunat_aproximado(ruc, periodo):
+    if not ruc or len(ruc) != 11 or not validar_periodo(periodo):
+        return ""
+    try:
+        ultimo_digito = int(ruc[-1])
+        año, mes = map(int, periodo.split("-"))
+        if mes == 12:
+            mes_venc = 1
+            año_venc = año + 1
+        else:
+            mes_venc = mes + 1
+            año_venc = año
+
+        dias_offset = {0: 14, 1: 15, 2: 16, 3: 17, 4: 18, 5: 19, 6: 20, 7: 21, 8: 22, 9: 23}
+        dia = dias_offset.get(ultimo_digito, 15)
+        return f"{año_venc:04d}-{mes_venc:02d}-{dia:02d}"
+    except Exception:
+        return ""
 
 def guardar_voucher_local(uploaded_file, id_obligacion):
     if uploaded_file is None:
@@ -302,6 +321,7 @@ clientes_db = cursor.fetchall()
 conn.close()
 
 dic_clientes = {cl[0]: cl[2] for cl in clientes_db}
+dic_ruc = {cl[0]: cl[1] for cl in clientes_db}
 
 # BARRA LATERAL ESTILO SUNAT
 st.sidebar.markdown('<div style="font-size: 15px; font-weight: 700; color: #003366; margin-bottom: 15px; border-bottom: 2px solid #D91A2A; padding-bottom: 5px;">MÓDULO DE REGISTRO</div>', unsafe_allow_html=True)
@@ -341,12 +361,18 @@ elif opcion_sidebar == "Registro de Obligación":
     if not clientes_db:
         st.sidebar.warning("No existen contribuyentes registrados. Ingrese uno antes de continuar.")
     else:
+        # Selección previa fuera del formulario para calcular vencimiento dinámicamente
+        cliente_sel = st.sidebar.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x])
+        tipo_ob = st.sidebar.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"])
+        situacion_ob = st.sidebar.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"])
+        periodo_ob = st.sidebar.text_input("Periodo Tributario (AAAA-MM):", placeholder="Ej: 2026-07")
+        
+        # Obtener RUC y calcular fecha de vencimiento SUNAT estimada
+        ruc_actual = dic_ruc.get(cliente_sel, "")
+        venc_auto = calcular_vencimiento_sunat_aproximado(ruc_actual, periodo_ob) if tipo_ob == "SUNAT" else ""
+
         with st.sidebar.form(key="form_obligacion", clear_on_submit=True):
-            cliente_sel = st.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x])
-            tipo_ob = st.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"])
-            situacion_ob = st.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"])
-            periodo_ob = st.text_input("Periodo Tributario (AAAA-MM):", placeholder="Ej: 2026-07")
-            venc_ob = st.text_input("Fecha de Vencimiento (AAAA-MM-DD):", placeholder="AAAA-MM-DD")
+            venc_ob = st.text_input("Fecha de Vencimiento (AAAA-MM-DD):", value=venc_auto, placeholder="AAAA-MM-DD")
             monto_ob = st.number_input("Monto Determinado (S/):", min_value=0.0, step=10.0, format="%.2f")
             pago_ob = st.date_input("Fecha de Pago Ejecutado (Opcional):", value=None, format="DD/MM/YYYY")
             tributos_ob = st.text_input("Descripción / Código de Tributo:")
@@ -474,7 +500,7 @@ with tab_pendientes:
             bytes_excel = generar_excel_bytes(False, txt_buscar, cliente_filtro_id, periodo_filtro)
             st.download_button("Exportar Reporte de Pendientes (Excel)", data=bytes_excel, file_name=f"Reporte_Pendientes_{datetime.now().strftime('%Y%m%d')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     else:
-        st.info("No se registraron obligaciones pendientes con los criterios seleccionados.")
+        st.info("No se registran obligaciones pendientes con los criterios seleccionados.")
 
 # ----------------- TABLA DE PAGADOS -----------------
 with tab_pagados:
