@@ -500,6 +500,57 @@ with tab_pendientes:
                 st.warning(f"La obligación con ID {id_elim} ha sido removida del sistema.")
                 st.rerun()
 
+        # MODIFICAR OBLIGACIÓN PENDIENTE
+        st.markdown('<div class="subtitulo-corporativo">Modificar Obligación Pendiente</div>', unsafe_allow_html=True)
+        id_mod = st.number_input("ID de Obligación a Editar:", min_value=1, step=1, key="mod_id_input")
+
+        conn = conectar_bd()
+        c = conn.cursor()
+        c.execute("SELECT id, cliente_id, tipo, situacion, periodo, monto, fecha_vencimiento, descripcion_tributos FROM obligaciones WHERE id=? AND estado='PENDIENTE'", (id_mod,))
+        ob_a_modificar = c.fetchone()
+        conn.close()
+
+        if ob_a_modificar:
+            with st.form(key="form_modificar_ob"):
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    lista_tipos = ["SUNAT", "AFP"]
+                    idx_tipo = lista_tipos.index(ob_a_modificar[2]) if ob_a_modificar[2] in lista_tipos else 0
+                    m_tipo = st.selectbox("Entidad / Tipo:", lista_tipos, index=idx_tipo)
+
+                    lista_sit = ["Declarado", "Por Declarar", "Fraccionado"]
+                    idx_sit = lista_sit.index(ob_a_modificar[3]) if ob_a_modificar[3] in lista_sit else 0
+                    m_situacion = st.selectbox("Estado de Declaración:", lista_sit, index=idx_sit)
+
+                    m_periodo = st.text_input("Periodo Tributario (AAAA-MM):", value=ob_a_modificar[4])
+
+                with col_m2:
+                    m_monto = st.number_input("Monto Determinado (S/):", min_value=0.01, step=10.0, format="%.2f", value=float(ob_a_modificar[5]))
+                    m_venc = st.text_input("Fecha de Vencimiento (AAAA-MM-DD):", value=ob_a_modificar[6] or "")
+                    m_tributos = st.text_input("Descripción / Código de Tributo:", value=ob_a_modificar[7] or "")
+
+                btn_guardar_mod = st.form_submit_button("Guardar Cambios", use_container_width=True)
+
+            if btn_guardar_mod:
+                if not validar_periodo(m_periodo):
+                    st.error("El periodo debe mantener la estructura AAAA-MM.")
+                elif m_monto <= 0:
+                    st.error("El monto ingresado debe ser mayor a 0.00.")
+                else:
+                    conn = conectar_bd()
+                    c = conn.cursor()
+                    c.execute("""
+                        UPDATE obligaciones 
+                        SET tipo=?, situacion=?, periodo=?, monto=?, fecha_vencimiento=?, descripcion_tributos=?
+                        WHERE id=?
+                    """, (m_tipo, m_situacion, m_periodo, m_monto, m_venc, m_tributos, id_mod))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"La obligación ID {id_mod} se actualizó exitosamente.")
+                    st.rerun()
+        else:
+            st.caption("Ingrese el ID de una obligación pendiente para habilitar el formulario de edición.")
+
         if OPENPYXL_DISPONIBLE:
             st.markdown("---")
             bytes_excel = generar_excel_bytes(False, txt_buscar, cliente_filtro_id, periodo_filtro)
