@@ -1,9 +1,9 @@
 import os
 import re
-import sqlite3
 from datetime import datetime, timedelta
 import io
 import streamlit as st
+from supabase import create_client, Client
 
 try:
     import openpyxl
@@ -20,151 +20,51 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS
 st.markdown("""
     <style>
-    /* Ocultar texto auxiliar 'Press Enter to submit form' */
-    [data-testid="InputInstructions"] {
-        display: none !important;
-    }
-
-    /* Fondo principal y tipografía general */
-    .main {
-        background-color: #F4F6F9;
-        font-family: 'Segoe UI', Arial, sans-serif;
-    }
-    
-    /* Encabezado Principal */
+    [data-testid="InputInstructions"] { display: none !important; }
+    .main { background-color: #F4F6F9; font-family: 'Segoe UI', Arial, sans-serif; }
     .titulo-corporativo {
-        color: #003366;
-        font-size: 24px;
-        font-weight: 700;
-        letter-spacing: -0.3px;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 3px solid #D91A2A;
+        color: #003366; font-size: 24px; font-weight: 700; letter-spacing: -0.3px;
+        margin-bottom: 20px; padding-bottom: 10px; border-bottom: 3px solid #D91A2A;
     }
-    
-    /* Subtítulos de sección */
     .subtitulo-corporativo {
-        color: #003366;
-        font-size: 15px;
-        font-weight: 700;
-        margin-top: 15px;
-        margin-bottom: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        color: #003366; font-size: 15px; font-weight: 700; margin-top: 15px;
+        margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;
     }
-
-    /* Fondo y texto de la Barra Lateral */
-    [data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E0E0E0;
-    }
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] span {
-        color: #333333 !important;
-    }
-
-    /* Campos de entrada de texto */
-    [data-testid="stSidebar"] input {
-        color: #000000 !important;
-        background-color: #FFFFFF !important;
-        border: 1px solid #CCCCCC !important;
-    }
-    
-    /* Selectbox (Desplegables) */
-    div[data-baseweb="select"] > div {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        border: 1px solid #CCCCCC !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #000000 !important;
-    }
-    div[data-baseweb="icon"] svg {
-        fill: #003366 !important;
-    }
-
-    /* Pestañas (Tabs) estilo SUNAT */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 6px;
-        background-color: #E9ECEF;
-        padding: 6px;
-        border-radius: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 38px;
-        white-space: pre-wrap;
-        border-radius: 4px;
-        font-weight: 600;
-        color: #003366;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #D91A2A !important;
-        color: #FFFFFF !important;
-    }
-
-    /* Botones de envío de formulario */
+    [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #E0E0E0; }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] span { color: #333333 !important; }
+    [data-testid="stSidebar"] input { color: #000000 !important; background-color: #FFFFFF !important; border: 1px solid #CCCCCC !important; }
+    div[data-baseweb="select"] > div { background-color: #FFFFFF !important; color: #000000 !important; border: 1px solid #CCCCCC !important; }
+    div[data-baseweb="select"] span { color: #000000 !important; }
+    div[data-baseweb="icon"] svg { fill: #003366 !important; }
+    .stTabs [data-baseweb="tab-list"] { gap: 6px; background-color: #E9ECEF; padding: 6px; border-radius: 4px; }
+    .stTabs [data-baseweb="tab"] { height: 38px; white-space: pre-wrap; border-radius: 4px; font-weight: 600; color: #003366; }
+    .stTabs [aria-selected="true"] { background-color: #D91A2A !important; color: #FFFFFF !important; }
     div[data-testid="stFormSubmitButton"] > button, div.stButton > button {
-        background-color: #003366 !important;
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        font-size: 15px !important;
-        border-radius: 4px !important;
-        border: none !important;
-        width: 100% !important;
+        background-color: #003366 !important; color: #FFFFFF !important;
+        font-weight: 700 !important; font-size: 15px !important; border-radius: 4px !important;
+        border: none !important; width: 100% !important;
     }
-    div[data-testid="stFormSubmitButton"] > button p, div.stButton > button p {
-        color: #FFFFFF !important;
-    }
-    div[data-testid="stFormSubmitButton"] > button:hover, div.stButton > button:hover {
-        background-color: #D91A2A !important;
-    }
+    div[data-testid="stFormSubmitButton"] > button p, div.stButton > button p { color: #FFFFFF !important; }
+    div[data-testid="stFormSubmitButton"] > button:hover, div.stButton > button:hover { background-color: #D91A2A !important; }
     </style>
 """, unsafe_allow_html=True)
+
+# =====================================================================
+# 1. CONEXIÓN A SUPABASE
+# =====================================================================
+@st.cache_resource
+def get_supabase_client() -> Client:
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase = get_supabase_client()
 
 CARPETA_VOUCHERS = "vouchers"
 if not os.path.exists(CARPETA_VOUCHERS):
     os.makedirs(CARPETA_VOUCHERS)
-
-# =====================================================================
-# 1. BASE DE DATOS Y UTILIDADES
-# =====================================================================
-def conectar_bd():
-    conn = sqlite3.connect("control_deudas.db", check_same_thread=False)
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
-
-def inicializar_bd():
-    conn = conectar_bd()
-    cursor = conn.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS clientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ruc TEXT UNIQUE NOT NULL,
-        razon_social TEXT NOT NULL,
-        contacto TEXT,
-        regimen TEXT DEFAULT 'MYPE Tributario'
-    )
-    """)
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS obligaciones (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cliente_id INTEGER,
-        tipo TEXT NOT NULL,
-        periodo TEXT NOT NULL,
-        monto REAL NOT NULL,
-        fecha_vencimiento TEXT,
-        estado TEXT DEFAULT 'PENDIENTE',
-        fecha_pago TEXT,
-        situacion TEXT DEFAULT 'Declarado',
-        ruta_voucher TEXT,
-        descripcion_tributos TEXT,
-        FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
-    )
-    """)
-    conn.commit()
-    conn.close()
 
 def validar_periodo(periodo_str):
     if not periodo_str:
@@ -201,30 +101,34 @@ def guardar_voucher_local(uploaded_file, id_obligacion):
     return ruta_destino
 
 def generar_excel_bytes(es_pago, texto_busqueda, id_cliente_filtro, filtro_periodo):
-    conn = conectar_bd()
-    cursor = conn.cursor()
     estado_filtro = "PAGADO" if es_pago else "PENDIENTE"
+    query = supabase.table("obligaciones").select("id, tipo, situacion, periodo, monto, fecha_vencimiento, fecha_pago, descripcion_tributos, clientes(id, razon_social, ruc, regimen)").eq("estado", estado_filtro)
 
-    query = f"""
-    SELECT o.id, c.razon_social, c.ruc, c.regimen, o.tipo, o.situacion, o.periodo, o.monto, o.fecha_vencimiento
-    {", o.fecha_pago" if es_pago else ""}, o.descripcion_tributos
-    FROM obligaciones o JOIN clientes c ON o.cliente_id = c.id WHERE o.estado = '{estado_filtro}'
-    """
-    params = []
-    if texto_busqueda:
-        query += " AND (c.razon_social LIKE ? OR c.ruc LIKE ?)"
-        params.extend([f"%{texto_busqueda}%", f"%{texto_busqueda}%"])
     if id_cliente_filtro and id_cliente_filtro != 0:
-        query += " AND o.cliente_id = ?"
-        params.append(id_cliente_filtro)
+        query = query.eq("cliente_id", id_cliente_filtro)
     if filtro_periodo:
-        query += " AND o.periodo LIKE ?"
-        params.append(f"%{filtro_periodo}%")
+        query = query.ilike("periodo", f"%{filtro_periodo}%")
 
-    query += " ORDER BY o.fecha_vencimiento ASC" if not es_pago else " ORDER BY o.fecha_pago DESC"
-    cursor.execute(query, params)
-    datos = cursor.fetchall()
-    conn.close()
+    res = query.order("fecha_vencimiento" if not es_pago else "fecha_pago", desc=es_pago).execute()
+    filas = res.data or []
+
+    datos = []
+    for item in filas:
+        cli = item.get("clientes") or {}
+        razon = cli.get("razon_social", "")
+        ruc = cli.get("ruc", "")
+        regimen = cli.get("regimen", "")
+
+        if texto_busqueda:
+            t = texto_busqueda.lower()
+            if t not in razon.lower() and t not in ruc.lower():
+                continue
+
+        fila = [item["id"], razon, ruc, regimen, item["tipo"], item["situacion"], item["periodo"], float(item["monto"]), item["fecha_vencimiento"]]
+        if es_pago:
+            fila.append(item.get("fecha_pago", ""))
+        fila.append(item.get("descripcion_tributos", ""))
+        datos.append(fila)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -311,24 +215,19 @@ def generar_excel_bytes(es_pago, texto_busqueda, id_cliente_filtro, filtro_perio
     wb.save(output)
     return output.getvalue()
 
-inicializar_bd()
-
 # =====================================================================
 # 2. INTERFAZ PRINCIPAL
 # =====================================================================
 st.markdown('<div class="titulo-corporativo">SUNAT - SISTEMA DE CONTROL DE OBLIGACIONES Y COMPROBANTES</div>', unsafe_allow_html=True)
 
-# Cargar catálogo de clientes
-conn = conectar_bd()
-cursor = conn.cursor()
-cursor.execute("SELECT id, ruc, razon_social FROM clientes ORDER BY razon_social ASC")
-clientes_db = cursor.fetchall()
-conn.close()
+# Cargar catálogo de clientes desde Supabase
+res_cli = supabase.table("clientes").select("id, ruc, razon_social").order("razon_social").execute()
+clientes_db = [(c["id"], c["ruc"], c["razon_social"]) for c in res_cli.data] if res_cli.data else []
 
 dic_clientes = {cl[0]: cl[2] for cl in clientes_db}
 dic_ruc = {cl[0]: cl[1] for cl in clientes_db}
 
-# BARRA LATERAL ESTILO SUNAT
+# BARRA LATERAL
 st.sidebar.markdown('<div style="font-size: 15px; font-weight: 700; color: #003366; margin-bottom: 15px; border-bottom: 2px solid #D91A2A; padding-bottom: 5px;">MÓDULO DE REGISTRO</div>', unsafe_allow_html=True)
 
 opcion_sidebar = st.sidebar.radio("Seleccione Operación:", ["Registro de Contribuyente", "Registro de Obligación"])
@@ -350,29 +249,27 @@ if opcion_sidebar == "Registro de Contribuyente":
             st.sidebar.error("El campo Razón Social es obligatorio.")
         else:
             try:
-                conn = conectar_bd()
-                c = conn.cursor()
-                c.execute("INSERT INTO clientes (ruc, razon_social, contacto, regimen) VALUES (?, ?, ?, ?)",
-                          (reg_ruc, reg_razon, reg_contacto, reg_regimen))
-                conn.commit()
-                conn.close()
+                supabase.table("clientes").insert({
+                    "ruc": reg_ruc,
+                    "razon_social": reg_razon,
+                    "contacto": reg_contacto,
+                    "regimen": reg_regimen
+                }).execute()
                 st.sidebar.success(f"Contribuyente '{reg_razon}' registrado correctamente.")
                 st.rerun()
-            except sqlite3.IntegrityError:
-                st.sidebar.error("El número de RUC ingresado ya se encuentra registrado.")
+            except Exception as e:
+                st.sidebar.error("Error al registrar: verifique que el RUC no esté duplicado.")
 
 elif opcion_sidebar == "Registro de Obligación":
     st.sidebar.markdown('<div class="subtitulo-corporativo">Detalle de la Obligación</div>', unsafe_allow_html=True)
     if not clientes_db:
         st.sidebar.warning("No existen contribuyentes registrados. Ingrese uno antes de continuar.")
     else:
-        # Selección previa fuera del formulario para cálculo dinámico de vencimiento
         cliente_sel = st.sidebar.selectbox("Contribuyente:", options=list(dic_clientes.keys()), format_func=lambda x: dic_clientes[x])
         tipo_ob = st.sidebar.selectbox("Entidad / Tipo:", ["SUNAT", "AFP"])
         situacion_ob = st.sidebar.selectbox("Estado de Declaración:", ["Declarado", "Por Declarar", "Fraccionado"])
         periodo_ob = st.sidebar.text_input("Periodo Tributario (AAAA-MM):", placeholder="Ej: 2026-07")
         
-        # Obtener RUC y calcular fecha de vencimiento SUNAT estimada
         ruc_actual = dic_ruc.get(cliente_sel, "")
         venc_auto = calcular_vencimiento_sunat_aproximado(ruc_actual, periodo_ob) if tipo_ob == "SUNAT" else ""
 
@@ -391,17 +288,21 @@ elif opcion_sidebar == "Registro de Obligación":
             else:
                 estado_ob = "PAGADO" if pago_ob else "PENDIENTE"
                 fecha_pago_str = pago_ob.strftime("%Y-%m-%d") if pago_ob else None
-                conn = conectar_bd()
-                c = conn.cursor()
-                c.execute("""INSERT INTO obligaciones (cliente_id, tipo, periodo, monto, fecha_vencimiento, estado, fecha_pago, situacion, descripcion_tributos)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                          (cliente_sel, tipo_ob, periodo_ob, monto_ob, venc_ob, estado_ob, fecha_pago_str, situacion_ob, tributos_ob))
-                conn.commit()
-                conn.close()
+                supabase.table("obligaciones").insert({
+                    "cliente_id": cliente_sel,
+                    "tipo": tipo_ob,
+                    "periodo": periodo_ob,
+                    "monto": monto_ob,
+                    "fecha_vencimiento": venc_ob,
+                    "estado": estado_ob,
+                    "fecha_pago": fecha_pago_str,
+                    "situacion": situacion_ob,
+                    "descripcion_tributos": tributos_ob
+                }).execute()
                 st.sidebar.success("Obligación financiera registrada en el sistema.")
                 st.rerun()
 
-# PANEL SUPERIOR DE FILTROS
+# PANEL DE FILTROS
 st.markdown('<div class="subtitulo-corporativo">Filtros de Búsqueda y Consulta</div>', unsafe_allow_html=True)
 col_filtro1, col_filtro2, col_filtro3 = st.columns([2, 2, 1])
 
@@ -414,32 +315,36 @@ with col_filtro2:
 with col_filtro3:
     periodo_filtro = st.text_input("Filtrar por Periodo:", placeholder="AAAA-MM")
 
-# SECCIONES PRINCIPALES
 tab_pendientes, tab_pagados = st.tabs(["Obligaciones Pendientes", "Historial de Obligaciones Pagadas"])
 
 # ----------------- TABLA DE PENDIENTES -----------------
 with tab_pendientes:
-    conn = conectar_bd()
-    c = conn.cursor()
-    query_pend = """
-    SELECT o.id, c.razon_social, c.ruc, c.regimen, o.tipo, o.situacion, o.periodo, o.monto, o.fecha_vencimiento, o.descripcion_tributos
-    FROM obligaciones o JOIN clientes c ON o.cliente_id = c.id WHERE o.estado = 'PENDIENTE'
-    """
-    params_p = []
-    if txt_buscar:
-        query_pend += " AND (c.razon_social LIKE ? OR c.ruc LIKE ?)"
-        params_p.extend([f"%{txt_buscar}%", f"%{txt_buscar}%"])
+    q_pend = supabase.table("obligaciones").select("id, tipo, situacion, periodo, monto, fecha_vencimiento, descripcion_tributos, clientes(id, razon_social, ruc, regimen)").eq("estado", "PENDIENTE")
     if cliente_filtro_id != 0:
-        query_pend += " AND o.cliente_id = ?"
-        params_p.append(cliente_filtro_id)
+        q_pend = q_pend.eq("cliente_id", cliente_filtro_id)
     if periodo_filtro:
-        query_pend += " AND o.periodo LIKE ?"
-        params_p.append(f"%{periodo_filtro}%")
-    query_pend += " ORDER BY o.fecha_vencimiento ASC"
+        q_pend = q_pend.ilike("periodo", f"%{periodo_filtro}%")
 
-    c.execute(query_pend, params_p)
-    filas_pend = c.fetchall()
-    conn.close()
+    res_pend = q_pend.order("fecha_vencimiento", desc=False).execute()
+    pend_data_raw = res_pend.data or []
+
+    filas_pend = []
+    for item in pend_data_raw:
+        cli = item.get("clientes") or {}
+        razon = cli.get("razon_social", "")
+        ruc = cli.get("ruc", "")
+        regimen = cli.get("regimen", "")
+
+        if txt_buscar:
+            t = txt_buscar.lower()
+            if t not in razon.lower() and t not in ruc.lower():
+                continue
+
+        filas_pend.append((
+            item["id"], razon, ruc, regimen, item["tipo"], item["situacion"],
+            item["periodo"], float(item["monto"]), item.get("fecha_vencimiento") or "",
+            item.get("descripcion_tributos") or ""
+        ))
 
     if filas_pend:
         data_pend = []
@@ -461,7 +366,7 @@ with tab_pendientes:
             data_pend.append({
                 "ID": f[0], "Estatus": alerta, "Razón Social": f[1], "RUC": f[2], "Régimen": f[3],
                 "Tipo": f[4], "Situación": f[5], "Periodo": f[6], "Monto (S/)": f"{f[7]:.2f}",
-                "Vencimiento": f[8] or "", "Detalle / Tributos": f[9] or ""
+                "Vencimiento": f[8], "Detalle / Tributos": f[9]
             })
 
         st.dataframe(data_pend, use_container_width=True)
@@ -473,34 +378,25 @@ with tab_pendientes:
             voucher_file = st.file_uploader("Adjuntar Comprobante de Pago (Imagen/PDF):", type=["png", "jpg", "jpeg", "pdf"])
 
             if st.button("Confirmar Pago", use_container_width=True):
-                conn = conectar_bd()
-                c = conn.cursor()
-                c.execute("SELECT id FROM obligaciones WHERE id=? AND estado='PENDIENTE'", (id_pagar,))
-                if c.fetchone():
+                check = supabase.table("obligaciones").select("id").eq("id", id_pagar).eq("estado", "PENDIENTE").execute()
+                if check.data:
                     ruta_v = guardar_voucher_local(voucher_file, id_pagar)
                     hoy_str = datetime.now().strftime("%Y-%m-%d")
-                    c.execute("UPDATE obligaciones SET estado='PAGADO', fecha_pago=?, ruta_voucher=? WHERE id=?", (hoy_str, ruta_v, id_pagar))
-                    conn.commit()
+                    supabase.table("obligaciones").update({"estado": "PAGADO", "fecha_pago": hoy_str, "ruta_voucher": ruta_v}).eq("id", id_pagar).execute()
                     st.success(f"La obligación con ID {id_pagar} fue actualizada a estado PAGADO.")
-                    conn.close()
                     st.rerun()
                 else:
                     st.error("El ID especificado no corresponde a una obligación pendiente válida.")
-                    conn.close()
 
         with col_accion2:
             st.markdown('<div class="subtitulo-corporativo">Eliminación de Registro</div>', unsafe_allow_html=True)
             id_elim = st.number_input("ID de Obligación a Remover:", min_value=1, step=1)
             if st.button("Eliminar Registro", use_container_width=True):
-                conn = conectar_bd()
-                c = conn.cursor()
-                c.execute("DELETE FROM obligaciones WHERE id=?", (id_elim,))
-                conn.commit()
-                conn.close()
+                supabase.table("obligaciones").delete().eq("id", id_elim).execute()
                 st.warning(f"La obligación con ID {id_elim} ha sido removida del sistema.")
                 st.rerun()
 
-        # MODIFICAR OBLIGACIÓN PENDIENTE (SOLO VISIBLE AL SELECCIONAR)
+        # MODIFICAR OBLIGACIÓN PENDIENTE
         st.markdown('<div class="subtitulo-corporativo">Modificar Obligación Pendiente</div>', unsafe_allow_html=True)
         
         lista_opciones_editar = [0] + [f[0] for f in filas_pend]
@@ -517,30 +413,26 @@ with tab_pendientes:
         )
 
         if id_mod != 0:
-            conn = conectar_bd()
-            c = conn.cursor()
-            c.execute("SELECT id, cliente_id, tipo, situacion, periodo, monto, fecha_vencimiento, descripcion_tributos FROM obligaciones WHERE id=? AND estado='PENDIENTE'", (id_mod,))
-            ob_a_modificar = c.fetchone()
-            conn.close()
-
-            if ob_a_modificar:
+            res_ob = supabase.table("obligaciones").select("*").eq("id", id_mod).eq("estado", "PENDIENTE").execute()
+            if res_ob.data:
+                ob_data = res_ob.data[0]
                 with st.form(key=f"form_modificar_ob_{id_mod}"):
                     col_m1, col_m2 = st.columns(2)
                     with col_m1:
                         lista_tipos = ["SUNAT", "AFP"]
-                        idx_tipo = lista_tipos.index(ob_a_modificar[2]) if ob_a_modificar[2] in lista_tipos else 0
+                        idx_tipo = lista_tipos.index(ob_data["tipo"]) if ob_data["tipo"] in lista_tipos else 0
                         m_tipo = st.selectbox("Entidad / Tipo:", lista_tipos, index=idx_tipo)
 
                         lista_sit = ["Declarado", "Por Declarar", "Fraccionado"]
-                        idx_sit = lista_sit.index(ob_a_modificar[3]) if ob_a_modificar[3] in lista_sit else 0
+                        idx_sit = lista_sit.index(ob_data["situacion"]) if ob_data["situacion"] in lista_sit else 0
                         m_situacion = st.selectbox("Estado de Declaración:", lista_sit, index=idx_sit)
 
-                        m_periodo = st.text_input("Periodo Tributario (AAAA-MM):", value=ob_a_modificar[4])
+                        m_periodo = st.text_input("Periodo Tributario (AAAA-MM):", value=ob_data["periodo"])
 
                     with col_m2:
-                        m_monto = st.number_input("Monto Determinado (S/):", min_value=0.01, step=10.0, format="%.2f", value=float(ob_a_modificar[5]))
-                        m_venc = st.text_input("Fecha de Vencimiento (AAAA-MM-DD):", value=ob_a_modificar[6] or "")
-                        m_tributos = st.text_input("Descripción / Código de Tributo:", value=ob_a_modificar[7] or "")
+                        m_monto = st.number_input("Monto Determinado (S/):", min_value=0.01, step=10.0, format="%.2f", value=float(ob_data["monto"]))
+                        m_venc = st.text_input("Fecha de Vencimiento (AAAA-MM-DD):", value=ob_data.get("fecha_vencimiento") or "")
+                        m_tributos = st.text_input("Descripción / Código de Tributo:", value=ob_data.get("descripcion_tributos") or "")
 
                     btn_guardar_mod = st.form_submit_button("Guardar Cambios", use_container_width=True)
 
@@ -550,15 +442,14 @@ with tab_pendientes:
                     elif m_monto <= 0:
                         st.error("El monto ingresado debe ser mayor a 0.00.")
                     else:
-                        conn = conectar_bd()
-                        c = conn.cursor()
-                        c.execute("""
-                            UPDATE obligaciones 
-                            SET tipo=?, situacion=?, periodo=?, monto=?, fecha_vencimiento=?, descripcion_tributos=?
-                            WHERE id=?
-                        """, (m_tipo, m_situacion, m_periodo, m_monto, m_venc, m_tributos, id_mod))
-                        conn.commit()
-                        conn.close()
+                        supabase.table("obligaciones").update({
+                            "tipo": m_tipo,
+                            "situacion": m_situacion,
+                            "periodo": m_periodo,
+                            "monto": m_monto,
+                            "fecha_vencimiento": m_venc,
+                            "descripcion_tributos": m_tributos
+                        }).eq("id", id_mod).execute()
                         st.success(f"La obligación ID {id_mod} se actualizó exitosamente.")
                         st.rerun()
 
@@ -571,27 +462,32 @@ with tab_pendientes:
 
 # ----------------- TABLA DE PAGADOS -----------------
 with tab_pagados:
-    conn = conectar_bd()
-    c = conn.cursor()
-    query_pag = """
-    SELECT o.id, c.razon_social, c.ruc, c.regimen, o.tipo, o.situacion, o.periodo, o.monto, o.fecha_vencimiento, o.fecha_pago, o.ruta_voucher, o.descripcion_tributos
-    FROM obligaciones o JOIN clientes c ON o.cliente_id = c.id WHERE o.estado = 'PAGADO'
-    """
-    params_pag = []
-    if txt_buscar:
-        query_pag += " AND (c.razon_social LIKE ? OR c.ruc LIKE ?)"
-        params_pag.extend([f"%{txt_buscar}%", f"%{txt_buscar}%"])
+    q_pag = supabase.table("obligaciones").select("id, tipo, situacion, periodo, monto, fecha_vencimiento, fecha_pago, ruta_voucher, descripcion_tributos, clientes(id, razon_social, ruc, regimen)").eq("estado", "PAGADO")
     if cliente_filtro_id != 0:
-        query_pag += " AND o.cliente_id = ?"
-        params_pag.append(cliente_filtro_id)
+        q_pag = q_pag.eq("cliente_id", cliente_filtro_id)
     if periodo_filtro:
-        query_pag += " AND o.periodo LIKE ?"
-        params_pag.append(f"%{periodo_filtro}%")
-    query_pag += " ORDER BY o.fecha_pago DESC"
+        q_pag = q_pag.ilike("periodo", f"%{periodo_filtro}%")
 
-    c.execute(query_pag, params_pag)
-    filas_pag = c.fetchall()
-    conn.close()
+    res_pag = q_pag.order("fecha_pago", desc=True).execute()
+    pag_data_raw = res_pag.data or []
+
+    filas_pag = []
+    for item in pag_data_raw:
+        cli = item.get("clientes") or {}
+        razon = cli.get("razon_social", "")
+        ruc = cli.get("ruc", "")
+        regimen = cli.get("regimen", "")
+
+        if txt_buscar:
+            t = txt_buscar.lower()
+            if t not in razon.lower() and t not in ruc.lower():
+                continue
+
+        filas_pag.append((
+            item["id"], razon, ruc, regimen, item["tipo"], item["situacion"],
+            item["periodo"], float(item["monto"]), item.get("fecha_vencimiento") or "",
+            item.get("fecha_pago") or "", item.get("ruta_voucher"), item.get("descripcion_tributos") or ""
+        ))
 
     if filas_pag:
         data_pag = []
@@ -599,8 +495,8 @@ with tab_pagados:
             data_pag.append({
                 "ID": f[0], "Razón Social": f[1], "RUC": f[2], "Régimen": f[3],
                 "Tipo": f[4], "Situación": f[5], "Periodo": f[6], "Monto (S/)": f"{f[7]:.2f}",
-                "Vencimiento": f[8] or "", "Fecha Pago": f[9] or "", "Comprobante": "Adjunto" if f[10] else "Sin Archivo",
-                "Detalle / Tributos": f[11] or ""
+                "Vencimiento": f[8], "Fecha Pago": f[9], "Comprobante": "Adjunto" if f[10] else "Sin Archivo",
+                "Detalle / Tributos": f[11]
             })
 
         st.dataframe(data_pag, use_container_width=True)
@@ -610,13 +506,9 @@ with tab_pagados:
             st.markdown('<div class="subtitulo-corporativo">Visualización de Comprobante</div>', unsafe_allow_html=True)
             id_ver_v = st.number_input("ID de Registro a Consultar:", min_value=1, step=1, key="v_ver")
             if st.button("Consultar Comprobante", use_container_width=True):
-                conn = conectar_bd()
-                c = conn.cursor()
-                c.execute("SELECT ruta_voucher FROM obligaciones WHERE id=?", (id_ver_v,))
-                res = c.fetchone()
-                conn.close()
-                if res and res[0] and os.path.exists(res[0]):
-                    ruta_archivo = res[0]
+                r_v = supabase.table("obligaciones").select("ruta_voucher").eq("id", id_ver_v).execute()
+                if r_v.data and r_v.data[0].get("ruta_voucher") and os.path.exists(r_v.data[0]["ruta_voucher"]):
+                    ruta_archivo = r_v.data[0]["ruta_voucher"]
                     extension = os.path.splitext(ruta_archivo)[1].lower()
                     
                     if extension in [".png", ".jpg", ".jpeg"]:
@@ -624,7 +516,6 @@ with tab_pagados:
                     elif extension == ".pdf":
                         with open(ruta_archivo, "rb") as f:
                             pdf_bytes = f.read()
-                        
                         st.success("Comprobante en formato PDF disponible.")
                         st.download_button(
                             label="Descargar Comprobante PDF",
@@ -643,11 +534,7 @@ with tab_pagados:
             if st.button("Actualizar Archivo", use_container_width=True):
                 if v_tardio:
                     ruta_t = guardar_voucher_local(v_tardio, id_sub_v)
-                    conn = conectar_bd()
-                    c = conn.cursor()
-                    c.execute("UPDATE obligaciones SET ruta_voucher=? WHERE id=?", (ruta_t, id_sub_v))
-                    conn.commit()
-                    conn.close()
+                    supabase.table("obligaciones").update({"ruta_voucher": ruta_t}).eq("id", id_sub_v).execute()
                     st.success("Comprobante adjuntado correctamente.")
                     st.rerun()
 

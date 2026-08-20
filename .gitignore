@@ -4,3 +4,4 @@ vouchers/
 control_deudas.db
 __pycache__/
 *.pyc
+.streamlit/
